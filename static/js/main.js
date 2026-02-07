@@ -42,17 +42,28 @@ async function api(url, options = {}) {
 function renderMarkdown(text) {
   if (typeof marked !== 'undefined') {
     marked.setOptions({ breaks: true, gfm: true });
+    // Replace ==concept== with clickable highlighted terms
+    text = text.replace(/==([^=]+)==/g, '<mark class="concept-link">$1</mark>');
     return marked.parse(text);
   }
   return text.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function attachConceptLinks(el) {
+  el.querySelectorAll('.concept-link').forEach(mark => {
+    mark.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const chatInput = document.getElementById('chat-input');
+      chatInput.textContent = mark.textContent;
+      handleSend();
+    });
+  });
 }
 
 function renderContent(el) {
   if (window.renderMathInElement) {
     renderMathInElement(el, {
       delimiters: [
-        { left: '$$', right: '$$', display: true },
-        { left: '$', right: '$', display: false },
         { left: '\\[', right: '\\]', display: true },
         { left: '\\(', right: '\\)', display: false },
       ],
@@ -153,6 +164,7 @@ async function addBotMessage(text, topicId) {
     msg.style.transition = 'opacity 0.3s ease';
     span.innerHTML = renderMarkdown(text);
     renderContent(span);
+    attachConceptLinks(span);
     messages.scrollTop = messages.scrollHeight;
     requestAnimationFrame(() => { msg.style.opacity = '1'; });
   } else {
@@ -168,6 +180,7 @@ async function addBotMessage(text, topicId) {
 
     span.innerHTML = renderMarkdown(text);
     renderContent(span);
+    attachConceptLinks(span);
     messages.scrollTop = messages.scrollHeight;
   }
 
@@ -186,6 +199,7 @@ function addStaticMessage(role, text, topicId) {
     span.innerHTML = renderMarkdown(text);
     msg.appendChild(span);
     renderContent(span);
+    attachConceptLinks(span);
   } else {
     msg.textContent = text;
   }
@@ -375,10 +389,6 @@ async function handleSend() {
         renderBreadcrumb();
       }
 
-      // Show suggestion chips if provided
-      if (data.suggestions && data.suggestions.length > 0) {
-        addSuggestionChips(data.suggestions, state.currentTopicId);
-      }
     } else {
       await addBotMessage("Something went wrong. Please try again.", topicAtSend);
     }
@@ -634,9 +644,6 @@ function renderCourseSelect() {
           hideThinkingIndicator();
           if (chatData && chatData.reply) {
             await addBotMessage(chatData.reply);
-            if (chatData.suggestions && chatData.suggestions.length > 0) {
-              addSuggestionChips(chatData.suggestions);
-            }
           }
         } catch (e) {
           hideThinkingIndicator();
@@ -865,7 +872,14 @@ function renderKnowledgeMap() {
     return;
   }
 
-  const { nodes, edges } = layoutKnowledgeMap(state.topics);
+  // Wrap topics under a virtual course root so all top-level topics connect to it
+  const courseRoot = {
+    id: -1,
+    title: state.currentCourse ? state.currentCourse.name : 'Course',
+    children: state.topics,
+    status: 'root',
+  };
+  const { nodes, edges } = layoutKnowledgeMap([courseRoot]);
   if (nodes.length === 0) {
     container.innerHTML = '<div class="sidebar-empty">Your knowledge map will grow as you explore topics.</div>';
     return;
@@ -903,16 +917,18 @@ function renderKnowledgeMap() {
 
   // Nodes
   nodes.forEach(n => {
+    const isRoot = n.id === -1;
     const isCurrent = n.id === state.currentTopicId;
     const isInProgress = n.status === 'in_progress';
     let nodeClass = 'km-node';
-    if (isCurrent) nodeClass += ' km-current';
+    if (isRoot) nodeClass += ' km-root';
+    else if (isCurrent) nodeClass += ' km-current';
     else if (isInProgress) nodeClass += ' km-visited';
     else nodeClass += ' km-unvisited';
 
-    const r = n.depth === 0 ? 22 : (n.depth === 1 ? 18 : 14);
+    const r = isRoot ? 24 : (n.depth <= 1 ? 20 : (n.depth === 2 ? 16 : 13));
     const truncTitle = n.title.length > 14 ? n.title.slice(0, 12) + '..' : n.title;
-    const fontSize = n.depth === 0 ? 9 : (n.depth === 1 ? 8 : 7);
+    const fontSize = isRoot ? 9 : (n.depth <= 1 ? 8.5 : (n.depth === 2 ? 7.5 : 7));
 
     svg += `<g class="${nodeClass}" data-topic-id="${n.id}" data-topic-title="${n.title.replace(/"/g, '&quot;')}" style="cursor:pointer">`;
     svg += `<title>${n.title}</title>`;
@@ -924,10 +940,11 @@ function renderKnowledgeMap() {
   svg += `</svg>`;
   container.innerHTML = svg;
 
-  // Attach click handlers
+  // Attach click handlers (skip course root node)
   container.querySelectorAll('.km-node').forEach(g => {
+    const id = parseInt(g.dataset.topicId);
+    if (id === -1) return;
     g.addEventListener('click', () => {
-      const id = parseInt(g.dataset.topicId);
       const title = g.dataset.topicTitle;
       drillIntoTopic(id, title, true);
     });
@@ -1089,9 +1106,6 @@ async function createCourseFromInput(text) {
       hideThinkingIndicator();
       if (data && data.reply) {
         await addBotMessage(data.reply);
-        if (data.suggestions && data.suggestions.length > 0) {
-          addSuggestionChips(data.suggestions);
-        }
       }
     } catch (err) {
       hideThinkingIndicator();
