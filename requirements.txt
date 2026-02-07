@@ -1,2 +1,7 @@
 flask
-anthropic
+flask-sqlalchemy
+flask-login
+authlib
+openai
+python-dotenv
+requests

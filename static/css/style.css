@@ -307,6 +307,66 @@ h1 {
   color: #3e2c1c;
 }
 
+/* ── Rendered markdown in bot messages ── */
+
+.bot-text p {
+  margin: 0.3rem 0;
+}
+
+.bot-text p:first-child {
+  margin-top: 0;
+}
+
+.bot-text p:last-child {
+  margin-bottom: 0;
+}
+
+.bot-text strong {
+  font-weight: 700;
+  color: #3e2c1c;
+}
+
+.bot-text em {
+  font-style: italic;
+}
+
+.bot-text ol,
+.bot-text ul {
+  margin: 0.4rem 0;
+  padding-left: 1.5rem;
+}
+
+.bot-text li {
+  margin: 0.2rem 0;
+}
+
+.bot-text code {
+  font-family: 'Fira Mono', monospace;
+  font-size: 0.88em;
+  background: rgba(62, 44, 28, 0.06);
+  padding: 0.1rem 0.3rem;
+  border-radius: 3px;
+}
+
+.bot-text pre {
+  margin: 0.5rem 0;
+  padding: 0.6rem 0.8rem;
+  background: rgba(62, 44, 28, 0.05);
+  border-radius: 4px;
+  overflow-x: auto;
+}
+
+.bot-text pre code {
+  background: none;
+  padding: 0;
+}
+
+.bot-text h1, .bot-text h2, .bot-text h3, .bot-text h4 {
+  font-size: 1rem;
+  font-weight: 700;
+  margin: 0.5rem 0 0.2rem;
+}
+
 .chat-input-line {
   display: flex;
   align-items: center;
@@ -432,4 +492,517 @@ h1 {
 .folder-leaf:hover {
   color: #eeddd0;
   background: rgba(238, 221, 208, 0.06);
+}
+
+/* ── Landing actions ── */
+
+.landing-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 2rem;
+}
+
+.landing-actions .btn-google {
+  margin-top: 0;
+}
+
+.btn-google {
+  gap: 0.6rem;
+}
+
+.btn-google svg {
+  flex-shrink: 0;
+}
+
+.btn-guest {
+  color: rgba(238, 221, 208, 0.3);
+  text-decoration: none;
+  font-size: 0.9rem;
+  font-family: inherit;
+  transition: color 0.2s;
+}
+
+.btn-guest:hover {
+  color: rgba(238, 221, 208, 0.7);
+}
+
+/* ── Course dropdown ── */
+
+.sidebar-header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.course-dropdown {
+  position: relative;
+  width: 100%;
+}
+
+.dropdown-selected {
+  padding: 0.45rem 0.6rem;
+  font-family: inherit;
+  font-size: 0.88rem;
+  color: #eeddd0;
+  background: rgba(238, 221, 208, 0.08);
+  border: 1px solid rgba(238, 221, 208, 0.15);
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding-right: 1.5rem;
+}
+
+.dropdown-selected::after {
+  content: '';
+  position: absolute;
+  right: 0.6rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 0;
+  height: 0;
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 5px solid rgba(238, 221, 208, 0.4);
+  transition: transform 0.2s;
+}
+
+.course-dropdown.open .dropdown-selected::after {
+  transform: translateY(-50%) rotate(180deg);
+}
+
+.dropdown-selected:hover {
+  background: rgba(238, 221, 208, 0.12);
+  border-color: rgba(238, 221, 208, 0.25);
+}
+
+.dropdown-selected.dropdown-placeholder {
+  color: rgba(238, 221, 208, 0.4);
+  font-style: italic;
+}
+
+.dropdown-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: #5a3e2b;
+  border: 1px solid rgba(238, 221, 208, 0.15);
+  border-radius: 5px;
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transition: max-height 0.25s ease, opacity 0.2s ease;
+  z-index: 20;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.course-dropdown.open .dropdown-menu {
+  max-height: 240px;
+  overflow-y: auto;
+  opacity: 1;
+}
+
+.dropdown-item {
+  padding: 0.45rem 0.6rem;
+  font-size: 0.88rem;
+  color: rgba(238, 221, 208, 0.7);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+
+.dropdown-item:hover {
+  background: rgba(238, 221, 208, 0.1);
+  color: #eeddd0;
+}
+
+.dropdown-item.dropdown-active {
+  color: #eeddd0;
+  background: rgba(238, 221, 208, 0.08);
+}
+
+.dropdown-item.dropdown-active::before {
+  content: '\2713';
+  margin-right: 0.4rem;
+  font-size: 0.75rem;
+}
+
+.dropdown-new {
+  border-top: 1px dashed rgba(238, 221, 208, 0.12);
+  color: rgba(238, 221, 208, 0.4);
+  font-style: italic;
+}
+
+.dropdown-new:hover {
+  color: rgba(238, 221, 208, 0.8);
+}
+
+.dropdown-input-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.5rem;
+  border-top: 1px dashed rgba(238, 221, 208, 0.12);
+}
+
+.dropdown-input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.35rem 0.5rem;
+  font-family: inherit;
+  font-size: 0.88rem;
+  color: #eeddd0;
+  background: rgba(238, 221, 208, 0.06);
+  border: 1px solid rgba(238, 221, 208, 0.2);
+  border-radius: 4px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+
+.dropdown-input::placeholder {
+  color: rgba(238, 221, 208, 0.3);
+  font-style: italic;
+}
+
+.dropdown-input:focus {
+  border-color: rgba(238, 221, 208, 0.4);
+}
+
+.dropdown-input-confirm {
+  padding: 0.3rem 0.55rem;
+  font-size: 0.78rem;
+  font-family: inherit;
+  color: rgba(238, 221, 208, 0.5);
+  border: 1px solid rgba(238, 221, 208, 0.15);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+  flex-shrink: 0;
+}
+
+.dropdown-input-confirm:hover {
+  color: #eeddd0;
+  border-color: rgba(238, 221, 208, 0.35);
+  background: rgba(238, 221, 208, 0.08);
+}
+
+/* ── Sidebar footer (user info) ── */
+
+.sidebar-footer {
+  margin-top: auto;
+  padding: 1rem 1.25rem;
+  border-top: 1px solid rgba(238, 221, 208, 0.08);
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.82rem;
+}
+
+.user-name {
+  color: rgba(238, 221, 208, 0.6);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.logout-link {
+  color: rgba(238, 221, 208, 0.35);
+  text-decoration: none;
+  font-size: 0.78rem;
+  flex-shrink: 0;
+  margin-left: 0.5rem;
+  transition: color 0.15s;
+}
+
+.logout-link:hover {
+  color: rgba(238, 221, 208, 0.7);
+}
+
+/* ── Empty state ── */
+
+.sidebar-empty {
+  padding: 1rem;
+  font-size: 0.85rem;
+  color: rgba(238, 221, 208, 0.35);
+  font-style: italic;
+}
+
+/* ── Topic tree (left sidebar) ── */
+
+.topic-tree {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.25rem 0;
+}
+
+.tree-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 0.75rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+  color: rgba(238, 221, 208, 0.6);
+  border-left: 2px solid transparent;
+  transition: background 0.15s, color 0.15s;
+}
+
+.tree-item:hover {
+  background: rgba(238, 221, 208, 0.06);
+  color: rgba(238, 221, 208, 0.85);
+}
+
+.tree-item.active {
+  color: #eeddd0;
+  background: rgba(238, 221, 208, 0.1);
+  border-left-color: #eeddd0;
+}
+
+.tree-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tree-here-marker {
+  font-size: 0.7rem;
+  color: rgba(238, 221, 208, 0.4);
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.tree-detail {
+  font-size: 0.82rem;
+  color: rgba(238, 221, 208, 0.45);
+}
+
+.tree-detail .tree-label::before {
+  content: '\00B7';
+  margin-right: 0.3rem;
+  color: rgba(238, 221, 208, 0.3);
+}
+
+.tree-detail.active {
+  color: rgba(238, 221, 208, 0.85);
+}
+
+/* ── Breadcrumb ── */
+
+.breadcrumb {
+  padding: 0.5rem 2.5rem;
+  font-size: 0.8rem;
+  color: rgba(62, 44, 28, 0.4);
+  border-bottom: 1px solid rgba(62, 44, 28, 0.08);
+  min-height: 1.8rem;
+}
+
+.breadcrumb:empty {
+  display: none;
+}
+
+.breadcrumb-segment {
+  cursor: pointer;
+  transition: color 0.15s;
+}
+
+.breadcrumb-segment:hover {
+  color: rgba(62, 44, 28, 0.7);
+}
+
+.breadcrumb-current {
+  color: rgba(62, 44, 28, 0.65);
+  font-weight: 600;
+}
+
+.breadcrumb-sep {
+  color: rgba(62, 44, 28, 0.25);
+}
+
+/* ── Branch markers (in chat) ── */
+
+.branch-marker {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.4rem 0;
+  margin: 0.5rem 0;
+  border-top: 1px solid rgba(62, 44, 28, 0.1);
+  font-size: 0.82rem;
+}
+
+.branch-label {
+  color: rgba(62, 44, 28, 0.5);
+  font-weight: 600;
+}
+
+.branch-label::before {
+  content: '';
+  display: inline-block;
+  width: 8px;
+  height: 1px;
+  background: rgba(62, 44, 28, 0.2);
+  margin-right: 0.4rem;
+  vertical-align: middle;
+}
+
+.branch-back {
+  color: rgba(62, 44, 28, 0.3);
+  cursor: pointer;
+  font-size: 0.78rem;
+  transition: color 0.15s;
+  margin-left: auto;
+}
+
+.branch-back:hover {
+  color: rgba(62, 44, 28, 0.6);
+}
+
+/* ── Suggestion chips ── */
+
+.suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  padding: 0.5rem 0;
+  margin-top: 0.25rem;
+}
+
+.suggestion-chip {
+  padding: 0.3rem 0.7rem;
+  font-size: 0.85rem;
+  font-family: inherit;
+  color: rgba(62, 44, 28, 0.5);
+  background: rgba(62, 44, 28, 0.05);
+  border: 1px solid rgba(62, 44, 28, 0.12);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+
+.suggestion-chip:hover {
+  color: rgba(62, 44, 28, 0.8);
+  background: rgba(62, 44, 28, 0.08);
+  border-color: rgba(62, 44, 28, 0.25);
+}
+
+/* ── Knowledge map ── */
+
+.knowledge-map {
+  padding: 0.5rem 0.5rem;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.km-svg {
+  width: 100%;
+  flex: 1;
+  min-height: 150px;
+}
+
+.km-edge {
+  fill: none;
+  stroke: rgba(238, 221, 208, 0.15);
+  stroke-width: 1.5;
+}
+
+.km-node circle {
+  transition: transform 0.2s, fill 0.2s, stroke 0.2s;
+}
+
+.km-node text {
+  fill: rgba(238, 221, 208, 0.5);
+  font-family: inherit;
+  pointer-events: none;
+}
+
+.km-node:hover circle {
+  filter: brightness(1.3);
+}
+
+.km-node:hover text {
+  fill: rgba(238, 221, 208, 0.85);
+}
+
+/* Current topic node */
+.km-current circle {
+  fill: rgba(238, 221, 208, 0.25);
+  stroke: #eeddd0;
+  stroke-width: 2;
+}
+
+.km-current text {
+  fill: #eeddd0;
+  font-weight: 600;
+}
+
+/* Visited/in-progress nodes */
+.km-visited circle {
+  fill: rgba(238, 221, 208, 0.12);
+  stroke: rgba(238, 221, 208, 0.35);
+  stroke-width: 1.5;
+}
+
+.km-visited text {
+  fill: rgba(238, 221, 208, 0.6);
+}
+
+/* Unvisited nodes */
+.km-unvisited circle {
+  fill: rgba(238, 221, 208, 0.05);
+  stroke: rgba(238, 221, 208, 0.15);
+  stroke-width: 1;
+  stroke-dasharray: 3 2;
+}
+
+.km-unvisited text {
+  fill: rgba(238, 221, 208, 0.3);
+}
+
+/* ── Thinking indicator ── */
+
+.thinking-indicator {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0.4rem 0;
+}
+
+.thinking-indicator .dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: rgba(62, 44, 28, 0.3);
+  animation: thinking-bounce 1.2s ease-in-out infinite;
+}
+
+.thinking-indicator .dot:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.thinking-indicator .dot:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes thinking-bounce {
+  0%, 60%, 100% {
+    transform: translateY(0);
+    opacity: 0.3;
+  }
+  30% {
+    transform: translateY(-4px);
+    opacity: 0.7;
+  }
+}
+
+/* ── Topic-scoped chat filtering ── */
+
+.topic-hidden {
+  display: none !important;
 }
