@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="no">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Studium</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <!-- Landing -->
+  <main id="landing" class="center">
+    <h1 class="fall-item">Studium</h1>
+    <p class="tagline fall-item"><span id="typed"></span><span class="cursor">|</span></p>
+    <a href="#" id="btn-go" class="btn-go fall-item">Let's go</a>
+  </main>
+
+  <!-- Chat -->
+  <section id="chat" class="chat-layout">
+
+    <!-- Left: Topic history -->
+    <aside id="sidebar-left" class="sidebar-left">
+      <div class="sidebar-header">Topics</div>
+      <div class="sidebar-content">
+        <ul class="topic-list">
+          <li class="topic-item active">Linear Algebra</li>
+          <li class="topic-item">Python Basics</li>
+          <li class="topic-item">Control Theory</li>
+        </ul>
+        <button class="new-topic-btn">+ New topic</button>
+      </div>
+    </aside>
+    <div id="drag-left" class="drag-handle"></div>
+
+    <!-- Center: Chat -->
+    <div class="chat-center">
+      <button id="toggle-left" class="sidebar-toggle toggle-left" title="Toggle topics">&#9664;</button>
+      <button id="toggle-right" class="sidebar-toggle toggle-right" title="Toggle subtopics">&#9654;</button>
+      <div id="chat-messages" class="chat-messages">
+        <div class="chat-input-line">
+          <span class="input-prompt">&gt;</span>
+          <span id="chat-input" class="input-text" contenteditable="true" spellcheck="false"></span><span class="input-cursor">|</span>
+        </div>
+      </div>
+    </div>
+
+    <div id="drag-right" class="drag-handle"></div>
+    <!-- Right: Subtopic directory -->
+    <aside id="sidebar-right" class="sidebar-right">
+      <div class="sidebar-header">Subtopics</div>
+      <div class="sidebar-content">
+        <div class="folder-tree">
+          <div class="folder open">
+            <div class="folder-name">Vectors</div>
+            <div class="folder-children">
+              <div class="folder-leaf">Dot product</div>
+              <div class="folder-leaf">Cross product</div>
+              <div class="folder-leaf">Vector spaces</div>
+            </div>
+          </div>
+          <div class="folder">
+            <div class="folder-name">Matrices</div>
+            <div class="folder-children">
+              <div class="folder-leaf">Multiplication</div>
+              <div class="folder-leaf">Determinants</div>
+              <div class="folder-leaf">Inverse</div>
+            </div>
+          </div>
+          <div class="folder">
+            <div class="folder-name">Eigenvalues</div>
+            <div class="folder-children">
+              <div class="folder-leaf">Eigenvectors</div>
+              <div class="folder-leaf">Diagonalization</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+  </section>
+
+  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html>
