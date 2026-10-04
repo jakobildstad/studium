@@ -9,6 +9,8 @@ const state = {
   topics: [],
   currentTopicId: null,
   topicPath: [],
+  isWaiting: false,
+  selectedModel: 'gpt-4o-mini',
 };
 
 // ── Helpers ──
@@ -41,10 +43,22 @@ async function api(url, options = {}) {
 
 function renderMarkdown(text) {
   if (typeof marked !== 'undefined') {
-    marked.setOptions({ breaks: true, gfm: true });
-    // Replace ==concept== with clickable highlighted terms
-    text = text.replace(/==([^=]+)==/g, '<mark class="concept-link">$1</mark>');
-    return marked.parse(text);
+    // Extract ==concept== into placeholders BEFORE marked touches the text
+    const highlights = [];
+    text = text.replace(/==([^=]+)==/g, function(_, concept) {
+      highlights.push(concept);
+      return 'XSTHL' + (highlights.length - 1) + 'LHTS';
+    });
+
+    var html = marked.parse(text, { breaks: true, gfm: true });
+
+    // Re-inject highlights as <mark> elements
+    for (var i = 0; i < highlights.length; i++) {
+      var safe = highlights[i].replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+      html = html.replace('XSTHL' + i + 'LHTS', '<mark class="concept-link">' + safe + '</mark>');
+    }
+
+    return html;
   }
   return text.replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
@@ -52,10 +66,11 @@ function renderMarkdown(text) {
 function attachConceptLinks(el) {
   el.querySelectorAll('.concept-link').forEach(mark => {
     mark.addEventListener('click', (e) => {
+      if (state.isWaiting) return;
       e.stopPropagation();
       const chatInput = document.getElementById('chat-input');
       chatInput.textContent = mark.textContent;
-      handleSend();
+      handleSend(mark.textContent);
     });
   });
 }
@@ -149,14 +164,16 @@ async function addBotMessage(text, topicId) {
   const messages = document.getElementById('chat-messages');
   const msg = document.createElement('div');
   msg.className = 'msg bot';
-  msg.dataset.topicId = topicId != null ? String(topicId) : '';
 
   const span = document.createElement('span');
   span.className = 'bot-text';
   msg.appendChild(span);
 
+  const wrapper = wrapWithDepthLines(msg, topicId);
+  wrapper.dataset.topicId = topicId != null ? String(topicId) : '';
+
   const inputLine = document.querySelector('.chat-input-line');
-  messages.insertBefore(msg, inputLine);
+  messages.insertBefore(wrapper, inputLine);
 
   if (text.length > 300) {
     // Long messages: render immediately with fade-in
@@ -184,14 +201,13 @@ async function addBotMessage(text, topicId) {
     messages.scrollTop = messages.scrollHeight;
   }
 
-  return msg;
+  return wrapper;
 }
 
 function addStaticMessage(role, text, topicId) {
   const messages = document.getElementById('chat-messages');
   const msg = document.createElement('div');
   msg.className = 'msg ' + role;
-  msg.dataset.topicId = topicId != null ? String(topicId) : '';
 
   if (role === 'bot') {
     const span = document.createElement('span');
@@ -204,47 +220,13 @@ function addStaticMessage(role, text, topicId) {
     msg.textContent = text;
   }
 
+  const wrapper = wrapWithDepthLines(msg, topicId);
+  wrapper.dataset.topicId = topicId != null ? String(topicId) : '';
+
   const inputLine = document.querySelector('.chat-input-line');
-  messages.insertBefore(msg, inputLine);
+  messages.insertBefore(wrapper, inputLine);
 }
 
-function addBranchMarker(topicTitle, parentTitle, topicId, beforeElement) {
-  const messages = document.getElementById('chat-messages');
-  const marker = document.createElement('div');
-  marker.className = 'branch-marker';
-  marker.dataset.topicId = topicId != null ? String(topicId) : '';
-
-  const label = document.createElement('span');
-  label.className = 'branch-label';
-  label.textContent = topicTitle;
-  marker.appendChild(label);
-
-  if (parentTitle) {
-    const back = document.createElement('span');
-    back.className = 'branch-back';
-    back.textContent = 'Back to ' + parentTitle;
-    back.addEventListener('click', () => {
-      // Navigate up to parent
-      const parentTopic = findTopicByTitle(state.topics, parentTitle);
-      if (parentTopic) {
-        drillIntoTopic(parentTopic.id, parentTopic.title, false);
-      } else {
-        // Go to root
-        state.currentTopicId = null;
-        state.topicPath = [];
-        renderBreadcrumb();
-        renderTopicTree();
-        renderKnowledgeMap();
-        filterMessagesByTopic();
-      }
-    });
-    marker.appendChild(back);
-  }
-
-  const insertPoint = beforeElement || document.querySelector('.chat-input-line');
-  messages.insertBefore(marker, insertPoint);
-  messages.scrollTop = messages.scrollHeight;
-}
 
 function addSuggestionChips(suggestions, topicId) {
   if (!suggestions || suggestions.length === 0) return;
@@ -259,6 +241,7 @@ function addSuggestionChips(suggestions, topicId) {
     chip.className = 'suggestion-chip';
     chip.textContent = s;
     chip.addEventListener('click', () => {
+      if (state.isWaiting) return;
       container.remove();
       chatInput.textContent = s;
       handleSend();
@@ -309,11 +292,24 @@ function focusInput() {
   sel.addRange(range);
 }
 
+function lockInput() {
+  state.isWaiting = true;
+  chatInput.contentEditable = 'false';
+  inputLine.classList.add('input-disabled');
+}
+
+function unlockInput() {
+  state.isWaiting = false;
+  chatInput.contentEditable = 'true';
+  inputLine.classList.remove('input-disabled');
+}
+
 document.querySelector('.chat-messages').addEventListener('click', (e) => {
   if (!window.getSelection().toString()) focusInput();
 });
 
-async function handleSend() {
+async function handleSend(forceTopic) {
+  if (state.isWaiting) return;
   const text = chatInput.textContent.trim();
   if (!text) return;
 
@@ -340,21 +336,28 @@ async function handleSend() {
   const userMsg = document.createElement('div');
   userMsg.className = 'msg user';
   userMsg.textContent = text;
-  userMsg.dataset.topicId = topicAtSend != null ? String(topicAtSend) : '';
-  messages.insertBefore(userMsg, inputLine);
+
+  const userWrapper = wrapWithDepthLines(userMsg, topicAtSend);
+  userWrapper.dataset.topicId = topicAtSend != null ? String(topicAtSend) : '';
+  messages.insertBefore(userWrapper, inputLine);
 
   chatInput.textContent = '';
   messages.scrollTop = messages.scrollHeight;
+  lockInput();
   showThinkingIndicator(topicAtSend);
 
   try {
+    const payload = {
+      conversation_id: state.currentConversation.id,
+      message: text,
+      topic_id: state.currentTopicId,
+      model: state.selectedModel,
+    };
+    if (forceTopic) payload.force_topic = forceTopic;
+
     const data = await api('/api/chat', {
       method: 'POST',
-      body: JSON.stringify({
-        conversation_id: state.currentConversation.id,
-        message: text,
-        topic_id: state.currentTopicId,
-      }),
+      body: JSON.stringify(payload),
     });
 
     hideThinkingIndicator();
@@ -372,14 +375,8 @@ async function handleSend() {
         const nt = data.new_topic;
 
         // Re-tag the triggering messages with the new child topic
-        userMsg.dataset.topicId = String(nt.id);
+        userWrapper.dataset.topicId = String(nt.id);
         botMsg.dataset.topicId = String(nt.id);
-
-        // Insert branch marker before the user message
-        const parentTitle = state.topicPath.length > 0
-          ? state.topicPath[state.topicPath.length - 1].title
-          : state.currentCourse?.name;
-        addBranchMarker(nt.title, parentTitle, nt.id, userMsg);
 
         // Update current topic to the new one
         state.currentTopicId = nt.id;
@@ -387,6 +384,17 @@ async function handleSend() {
         await loadTopics();
         state.topicPath = buildTopicPath(state.topics, nt.id);
         renderBreadcrumb();
+
+        // Re-render depth lines now that the topic tree is updated
+        updateWrapperDepthLines(userWrapper, nt.id);
+        updateWrapperDepthLines(botMsg, nt.id);
+        updateDepthIndicator();
+        filterMessagesByTopic();
+      }
+
+      // Show suggestion chips if the AI provided them
+      if (data.suggestions && data.suggestions.length > 0) {
+        addSuggestionChips(data.suggestions, state.currentTopicId);
       }
 
     } else {
@@ -395,13 +403,16 @@ async function handleSend() {
   } catch (err) {
     hideThinkingIndicator();
     await addBotMessage("Something went wrong. Please try again.", topicAtSend);
+  } finally {
+    unlockInput();
+    focusInput();
   }
-  focusInput();
 }
 
 chatInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') {
     e.preventDefault();
+    if (state.isWaiting) return;
     handleSend();
   }
 });
@@ -463,6 +474,31 @@ function initDrag(handleId, side) {
 initDrag('drag-left', 'left');
 initDrag('drag-right', 'right');
 
+// ── Model chooser ──
+
+const modelBtn = document.getElementById('model-btn');
+const modelDropdown = document.getElementById('model-dropdown');
+
+modelBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  modelDropdown.classList.toggle('open');
+});
+
+modelDropdown.querySelectorAll('.model-option').forEach(opt => {
+  opt.addEventListener('click', (e) => {
+    e.stopPropagation();
+    state.selectedModel = opt.dataset.model;
+    modelBtn.textContent = opt.dataset.model;
+    modelDropdown.querySelectorAll('.model-option').forEach(o => o.classList.remove('active'));
+    opt.classList.add('active');
+    modelDropdown.classList.remove('open');
+  });
+});
+
+document.addEventListener('click', () => {
+  modelDropdown.classList.remove('open');
+});
+
 // ── Topic tree helpers ──
 
 function findTopicById(topics, id) {
@@ -476,16 +512,6 @@ function findTopicById(topics, id) {
   return null;
 }
 
-function findTopicByTitle(topics, title) {
-  for (const t of topics) {
-    if (t.title === title) return t;
-    if (t.children) {
-      const found = findTopicByTitle(t.children, title);
-      if (found) return found;
-    }
-  }
-  return null;
-}
 
 function buildTopicPath(topics, targetId) {
   // Build path from root to target
@@ -501,6 +527,71 @@ function buildTopicPath(topics, targetId) {
     return null;
   }
   return search(topics, []) || [];
+}
+
+// ── Message depth lines ──
+
+function createMessageDepthLines(topicId) {
+  const container = document.createElement('div');
+  container.className = 'msg-depth-lines';
+
+  if (topicId == null) return container;
+
+  const topicPath = buildTopicPath(state.topics, parseInt(topicId));
+  if (topicPath.length === 0) return container;
+
+  // Full path: course root + topic ancestors (exclude current topic)
+  const fullPath = [
+    { id: null, title: state.currentCourse?.name || 'Topic' },
+    ...topicPath
+  ];
+
+  for (let i = 0; i < fullPath.length - 1; i++) {
+    const level = fullPath[i];
+    const line = document.createElement('div');
+    line.className = 'depth-line';
+    line.dataset.tooltip = level.title;
+    line.addEventListener('click', () => {
+      if (state.isWaiting) return;
+      if (i === 0) {
+        state.currentTopicId = null;
+        state.topicPath = [];
+      } else {
+        state.currentTopicId = fullPath[i].id;
+        state.topicPath = topicPath.slice(0, i);
+      }
+      renderBreadcrumb();
+      renderKnowledgeMap();
+      filterMessagesByTopic();
+      updateDepthIndicator();
+      focusInput();
+    });
+    container.appendChild(line);
+  }
+
+  return container;
+}
+
+function wrapWithDepthLines(element, topicId) {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'msg-wrapper';
+  wrapper.dataset.topicId = element.dataset.topicId || '';
+
+  const depthLines = createMessageDepthLines(topicId);
+  wrapper.appendChild(depthLines);
+  wrapper.appendChild(element);
+
+  return wrapper;
+}
+
+function updateWrapperDepthLines(wrapper, topicId) {
+  const oldLines = wrapper.querySelector('.msg-depth-lines');
+  const newLines = createMessageDepthLines(topicId);
+  if (oldLines) {
+    wrapper.replaceChild(newLines, oldLines);
+  } else {
+    wrapper.insertBefore(newLines, wrapper.firstChild);
+  }
 }
 
 // ── Topic filtering ──
@@ -535,38 +626,33 @@ function filterMessagesByTopic() {
 
 // ── Render functions ──
 
-function renderCourseSelect() {
-  const dropdown = document.getElementById('course-dropdown');
-  const selected = document.getElementById('dropdown-selected');
-  const menu = document.getElementById('dropdown-menu');
-  menu.innerHTML = '';
+function renderTopicList() {
+  const container = document.getElementById('topic-list');
+  container.innerHTML = '';
 
-  // Show current course name
-  if (state.currentCourse) {
-    selected.textContent = state.currentCourse.name;
-    selected.classList.remove('dropdown-placeholder');
-  } else {
-    selected.textContent = 'Select course...';
-    selected.classList.add('dropdown-placeholder');
+  if (state.courses.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'sidebar-empty';
+    empty.textContent = 'No topics yet.';
+    container.appendChild(empty);
+    return;
   }
 
-  // Build course items
   state.courses.forEach(c => {
     const item = document.createElement('div');
-    item.className = 'dropdown-item';
+    item.className = 'topic-item';
     if (state.currentCourse && c.id === state.currentCourse.id) {
-      item.classList.add('dropdown-active');
+      item.classList.add('active');
     }
     item.textContent = c.name;
-    item.addEventListener('click', async (e) => {
-      e.stopPropagation();
-      dropdown.classList.remove('open');
+    item.addEventListener('click', async () => {
+      if (state.isWaiting) return;
       if (state.currentCourse && c.id === state.currentCourse.id) return;
 
       state.currentCourse = c;
       state.currentTopicId = null;
       state.topicPath = [];
-      renderCourseSelect();
+      renderTopicList();
       await loadConversation();
       await loadTopics();
       renderBreadcrumb();
@@ -579,158 +665,90 @@ function renderCourseSelect() {
       }
       focusInput();
     });
-    menu.appendChild(item);
-  });
-
-  // "+ New course" item
-  const newItem = document.createElement('div');
-  newItem.className = 'dropdown-item dropdown-new';
-  newItem.textContent = '+ New course';
-  newItem.addEventListener('click', (e) => {
-    e.stopPropagation();
-
-    // Replace the "+ New course" item with an inline input
-    newItem.style.display = 'none';
-    const inputRow = document.createElement('div');
-    inputRow.className = 'dropdown-input-row';
-
-    const input = document.createElement('input');
-    input.type = 'text';
-    input.className = 'dropdown-input';
-    input.placeholder = 'Course name...';
-    input.spellcheck = false;
-
-    const confirm = document.createElement('span');
-    confirm.className = 'dropdown-input-confirm';
-    confirm.textContent = 'Go';
-
-    inputRow.appendChild(input);
-    inputRow.appendChild(confirm);
-    menu.appendChild(inputRow);
-    input.focus();
-
-    async function submitCourse() {
-      const name = input.value.trim();
-      if (!name) return;
-      inputRow.remove();
-      dropdown.classList.remove('open');
-
-      const data = await api('/api/courses', {
-        method: 'POST',
-        body: JSON.stringify({ name }),
-      });
-      if (data) {
-        await loadCourses();
-        state.currentCourse = state.courses.find(c => c.id === data.id);
-        renderCourseSelect();
-        state.currentConversation = { id: data.conversation_id, title: name };
-        state.currentTopicId = null;
-        state.topicPath = [];
-        await loadTopics();
-        renderBreadcrumb();
-        clearChatMessages();
-
-        // Ask AI for initial suggestions
-        showThinkingIndicator(null);
-        try {
-          const chatData = await api('/api/chat', {
-            method: 'POST',
-            body: JSON.stringify({
-              conversation_id: data.conversation_id,
-              message: `I want to learn about ${name}`,
-              topic_id: null,
-            }),
-          });
-          hideThinkingIndicator();
-          if (chatData && chatData.reply) {
-            await addBotMessage(chatData.reply);
-          }
-        } catch (e) {
-          hideThinkingIndicator();
-          await addBotMessage(`Welcome to ${name}! What would you like to start with?`);
-        }
-        focusInput();
-      }
-    }
-
-    function cancelInput() {
-      inputRow.remove();
-      newItem.style.display = '';
-    }
-
-    input.addEventListener('keydown', (ev) => {
-      ev.stopPropagation();
-      if (ev.key === 'Enter') submitCourse();
-      if (ev.key === 'Escape') cancelInput();
-    });
-    input.addEventListener('click', (ev) => ev.stopPropagation());
-    confirm.addEventListener('click', (ev) => {
-      ev.stopPropagation();
-      submitCourse();
-    });
-  });
-  menu.appendChild(newItem);
-
-  // Toggle dropdown on click
-  selected.onclick = (e) => {
-    e.stopPropagation();
-    dropdown.classList.toggle('open');
-  };
-}
-
-// Close dropdown when clicking outside
-document.addEventListener('click', () => {
-  const dropdown = document.getElementById('course-dropdown');
-  if (dropdown) dropdown.classList.remove('open');
-});
-
-function renderTopicTree() {
-  const container = document.getElementById('topic-tree');
-  container.innerHTML = '';
-
-  if (state.topics.length === 0) {
-    const empty = document.createElement('div');
-    empty.className = 'sidebar-empty';
-    empty.textContent = 'Topics will appear as you ask questions.';
-    container.appendChild(empty);
-    return;
-  }
-
-  function buildNode(topic, depth) {
-    const item = document.createElement('div');
-    item.className = 'tree-item';
-    if (depth >= 2) item.classList.add('tree-detail');
-    if (state.currentTopicId === topic.id) {
-      item.classList.add('active');
-    }
-    item.style.paddingLeft = (0.75 + depth * 0.75) + 'rem';
-
-    const label = document.createElement('span');
-    label.className = 'tree-label';
-    label.textContent = topic.title;
-    item.appendChild(label);
-
-    if (state.currentTopicId === topic.id) {
-      const marker = document.createElement('span');
-      marker.className = 'tree-here-marker';
-      marker.textContent = '<';
-      item.appendChild(marker);
-    }
-
-    item.addEventListener('click', (e) => {
-      e.stopPropagation();
-      drillIntoTopic(topic.id, topic.title, true);
-    });
-
     container.appendChild(item);
+  });
+}
 
-    if (topic.children && topic.children.length > 0) {
-      topic.children.forEach(child => buildNode(child, depth + 1));
+document.getElementById('new-topic-btn').addEventListener('click', () => {
+  if (state.isWaiting) return;
+  const footer = document.querySelector('.sidebar-footer');
+  const btn = document.getElementById('new-topic-btn');
+  btn.style.display = 'none';
+
+  const inputRow = document.createElement('div');
+  inputRow.className = 'new-topic-input-row';
+
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'new-topic-input';
+  input.placeholder = 'Topic name...';
+  input.spellcheck = false;
+
+  inputRow.appendChild(input);
+  footer.insertBefore(inputRow, btn);
+  input.focus();
+
+  async function submit() {
+    const name = input.value.trim();
+    if (!name) { cancel(); return; }
+    inputRow.remove();
+    btn.style.display = '';
+
+    const data = await api('/api/courses', {
+      method: 'POST',
+      body: JSON.stringify({ name }),
+    });
+    if (data) {
+      await loadCourses();
+      state.currentCourse = state.courses.find(c => c.id === data.id);
+      renderTopicList();
+      state.currentConversation = { id: data.conversation_id, title: name };
+      state.currentTopicId = null;
+      state.topicPath = [];
+      await loadTopics();
+      renderBreadcrumb();
+      clearChatMessages();
+
+      lockInput();
+      showThinkingIndicator(null);
+      try {
+        const chatData = await api('/api/chat', {
+          method: 'POST',
+          body: JSON.stringify({
+            conversation_id: data.conversation_id,
+            message: `I want to learn about ${name}`,
+            topic_id: null,
+            model: state.selectedModel,
+          }),
+        });
+        hideThinkingIndicator();
+        if (chatData && chatData.reply) {
+          await addBotMessage(chatData.reply);
+          if (chatData.suggestions && chatData.suggestions.length > 0) {
+            addSuggestionChips(chatData.suggestions, null);
+          }
+        }
+      } catch (e) {
+        hideThinkingIndicator();
+        await addBotMessage(`Welcome to ${name}! What would you like to start with?`);
+      } finally {
+        unlockInput();
+      }
+      focusInput();
     }
   }
 
-  state.topics.forEach(topic => buildNode(topic, 0));
-}
+  function cancel() {
+    inputRow.remove();
+    btn.style.display = '';
+  }
+
+  input.addEventListener('keydown', (ev) => {
+    ev.stopPropagation();
+    if (ev.key === 'Enter') submit();
+    if (ev.key === 'Escape') cancel();
+  });
+});
 
 function renderBreadcrumb() {
   const bc = document.getElementById('breadcrumb');
@@ -746,9 +764,10 @@ function renderBreadcrumb() {
     state.currentTopicId = null;
     state.topicPath = [];
     renderBreadcrumb();
-    renderTopicTree();
+
     renderKnowledgeMap();
     filterMessagesByTopic();
+    updateDepthIndicator();
   });
   bc.appendChild(root);
 
@@ -770,12 +789,60 @@ function renderBreadcrumb() {
       state.currentTopicId = seg.id;
       state.topicPath = state.topicPath.slice(0, i + 1);
       renderBreadcrumb();
-      renderTopicTree();
+  
       renderKnowledgeMap();
       filterMessagesByTopic();
+      updateDepthIndicator();
     });
     bc.appendChild(span);
   });
+}
+
+function updateDepthIndicator() {
+  const container = document.getElementById('depth-indicator');
+  if (!container) return;
+
+  container.innerHTML = '';
+
+  // No lines if at root (no topic path)
+  if (!state.topicPath || state.topicPath.length === 0) return;
+
+  // Create a line for each level in the path
+  // Include the course root as level 0
+  const fullPath = [
+    { id: null, title: state.currentCourse?.name || 'Topic' },
+    ...state.topicPath
+  ];
+
+  // Show lines for each level (skip the last one since that's current)
+  for (let i = 0; i < fullPath.length - 1; i++) {
+    const level = fullPath[i];
+    const line = document.createElement('div');
+    line.className = 'depth-line';
+    line.dataset.tooltip = `Back to: ${level.title}`;
+    line.dataset.levelIndex = i;
+
+    line.addEventListener('click', () => {
+      if (i === 0) {
+        // Navigate to root
+        state.currentTopicId = null;
+        state.topicPath = [];
+      } else {
+        // Navigate to this level in the path
+        const targetLevel = fullPath[i];
+        state.currentTopicId = targetLevel.id;
+        state.topicPath = state.topicPath.slice(0, i);
+      }
+      renderBreadcrumb();
+  
+      renderKnowledgeMap();
+      filterMessagesByTopic();
+      updateDepthIndicator();
+      focusInput();
+    });
+
+    container.appendChild(line);
+  }
 }
 
 function renderUserInfo() {
@@ -872,14 +939,8 @@ function renderKnowledgeMap() {
     return;
   }
 
-  // Wrap topics under a virtual course root so all top-level topics connect to it
-  const courseRoot = {
-    id: -1,
-    title: state.currentCourse ? state.currentCourse.name : 'Course',
-    children: state.topics,
-    status: 'root',
-  };
-  const { nodes, edges } = layoutKnowledgeMap([courseRoot]);
+  // Render topics directly - the backend now creates a real root topic with the course name
+  const { nodes, edges } = layoutKnowledgeMap(state.topics);
   if (nodes.length === 0) {
     container.innerHTML = '<div class="sidebar-empty">Your knowledge map will grow as you explore topics.</div>';
     return;
@@ -917,12 +978,12 @@ function renderKnowledgeMap() {
 
   // Nodes
   nodes.forEach(n => {
-    const isRoot = n.id === -1;
+    const isRoot = n.depth === 0; // Root topic has depth 0
     const isCurrent = n.id === state.currentTopicId;
     const isInProgress = n.status === 'in_progress';
     let nodeClass = 'km-node';
-    if (isRoot) nodeClass += ' km-root';
-    else if (isCurrent) nodeClass += ' km-current';
+    if (isCurrent) nodeClass += ' km-current';
+    else if (isRoot) nodeClass += ' km-root';
     else if (isInProgress) nodeClass += ' km-visited';
     else nodeClass += ' km-unvisited';
 
@@ -940,10 +1001,9 @@ function renderKnowledgeMap() {
   svg += `</svg>`;
   container.innerHTML = svg;
 
-  // Attach click handlers (skip course root node)
+  // Attach click handlers to all topic nodes
   container.querySelectorAll('.km-node').forEach(g => {
     const id = parseInt(g.dataset.topicId);
-    if (id === -1) return;
     g.addEventListener('click', () => {
       const title = g.dataset.topicTitle;
       drillIntoTopic(id, title, true);
@@ -954,35 +1014,23 @@ function renderKnowledgeMap() {
 // ── Topic navigation ──
 
 async function drillIntoTopic(topicId, topicTitle, insertMarker) {
-  const parentTitle = state.topicPath.length > 0
-    ? state.topicPath[state.topicPath.length - 1].title
-    : state.currentCourse?.name;
-
   // Build the path to this topic
   state.topicPath = buildTopicPath(state.topics, topicId);
   state.currentTopicId = topicId;
 
-  if (insertMarker) {
-    // Only insert branch marker if one doesn't already exist for this topic
-    const container = document.getElementById('chat-messages');
-    const existing = container.querySelector(`.branch-marker[data-topic-id="${topicId}"]`);
-    if (!existing) {
-      addBranchMarker(topicTitle, parentTitle, topicId);
-
-      // Notify backend of the branch
-      if (state.currentConversation) {
-        await api(`/api/conversations/${state.currentConversation.id}/branch`, {
-          method: 'POST',
-          body: JSON.stringify({ topic_id: topicId, topic_title: topicTitle }),
-        });
-      }
-    }
+  if (insertMarker && state.currentConversation) {
+    // Notify backend of the branch
+    await api(`/api/conversations/${state.currentConversation.id}/branch`, {
+      method: 'POST',
+      body: JSON.stringify({ topic_id: topicId, topic_title: topicTitle }),
+    });
   }
 
   renderBreadcrumb();
-  renderTopicTree();
+
   renderKnowledgeMap();
   filterMessagesByTopic();
+  updateDepthIndicator();
   focusInput();
 }
 
@@ -1010,13 +1058,13 @@ async function loadConversation() {
 async function loadTopics() {
   if (!state.currentCourse) {
     state.topics = [];
-    renderTopicTree();
+
     renderKnowledgeMap();
     return;
   }
   const data = await api(`/api/courses/${state.currentCourse.id}/topics`);
   if (data) state.topics = data;
-  renderTopicTree();
+
   renderKnowledgeMap();
 }
 
@@ -1029,18 +1077,7 @@ async function loadAndDisplayMessages() {
   state.currentConversation = data;
   clearChatMessages();
 
-  let lastTopicId = null;
   data.messages.forEach(m => {
-    // Insert branch markers when topic context changes
-    if (m.topic_id !== lastTopicId && m.topic_id !== null && lastTopicId !== null) {
-      const topic = findTopicById(state.topics, m.topic_id);
-      if (topic) {
-        const parentTopic = findTopicById(state.topics, lastTopicId);
-        addBranchMarker(topic.title, parentTopic ? parentTopic.title : state.currentCourse?.name, m.topic_id);
-      }
-    }
-    lastTopicId = m.topic_id;
-
     addStaticMessage(m.role === 'assistant' ? 'bot' : 'user', m.content, m.topic_id);
   });
 
@@ -1056,9 +1093,10 @@ async function loadAndDisplayMessages() {
   const messages = document.getElementById('chat-messages');
   messages.scrollTop = messages.scrollHeight;
   renderBreadcrumb();
-  renderTopicTree();
+
   renderKnowledgeMap();
   filterMessagesByTopic();
+  updateDepthIndicator();
 }
 
 async function createCourseFromInput(text) {
@@ -1067,53 +1105,63 @@ async function createCourseFromInput(text) {
   const userMsg = document.createElement('div');
   userMsg.className = 'msg user';
   userMsg.textContent = text;
-  userMsg.dataset.topicId = '';
-  messages.insertBefore(userMsg, inputLine);
+
+  const userWrapper = wrapWithDepthLines(userMsg, null);
+  userWrapper.dataset.topicId = '';
+  messages.insertBefore(userWrapper, inputLine);
   chatInput.textContent = '';
   messages.scrollTop = messages.scrollHeight;
+  lockInput();
 
-  const courseData = await api('/api/courses', {
-    method: 'POST',
-    body: JSON.stringify({ name: text.trim() }),
-  });
+  try {
+    const courseData = await api('/api/courses', {
+      method: 'POST',
+      body: JSON.stringify({ name: text.trim() }),
+    });
 
-  if (courseData) {
-    await loadCourses();
-    state.currentCourse = state.courses.find(c => c.id === courseData.id);
-    renderCourseSelect();
+    if (courseData) {
+      await loadCourses();
+      state.currentCourse = state.courses.find(c => c.id === courseData.id);
+      renderTopicList();
 
-    state.currentConversation = {
-      id: courseData.conversation_id,
-      title: text.trim(),
-    };
-    state.currentTopicId = null;
-    state.topicPath = [];
-    await loadTopics();
-    renderBreadcrumb();
+      state.currentConversation = {
+        id: courseData.conversation_id,
+        title: text.trim(),
+      };
+      state.currentTopicId = null;
+      state.topicPath = [];
+      await loadTopics();
+      renderBreadcrumb();
 
-    // Send first message to AI to get suggestions
-    showThinkingIndicator(null);
-    try {
-      const data = await api('/api/chat', {
-        method: 'POST',
-        body: JSON.stringify({
-          conversation_id: courseData.conversation_id,
-          message: `I want to learn about ${text.trim()}`,
-          topic_id: null,
-        }),
-      });
+      // Send first message to AI to get suggestions
+      showThinkingIndicator(null);
+      try {
+        const data = await api('/api/chat', {
+          method: 'POST',
+          body: JSON.stringify({
+            conversation_id: courseData.conversation_id,
+            message: `I want to learn about ${text.trim()}`,
+            topic_id: null,
+            model: state.selectedModel,
+          }),
+        });
 
-      hideThinkingIndicator();
-      if (data && data.reply) {
-        await addBotMessage(data.reply);
+        hideThinkingIndicator();
+        if (data && data.reply) {
+          await addBotMessage(data.reply);
+          if (data.suggestions && data.suggestions.length > 0) {
+            addSuggestionChips(data.suggestions, null);
+          }
+        }
+      } catch (err) {
+        hideThinkingIndicator();
+        await addBotMessage(`Welcome to ${text.trim()}! What would you like to learn about?`);
       }
-    } catch (err) {
-      hideThinkingIndicator();
-      await addBotMessage(`Great! I've set up "${text.trim()}" as your course. What would you like to learn about?`);
     }
+  } finally {
+    unlockInput();
+    focusInput();
   }
-
-  focusInput();
 }
 
 // ── App initialization ──
@@ -1128,7 +1176,7 @@ async function initApp() {
 
   if (state.courses.length > 0) {
     state.currentCourse = state.courses[0];
-    renderCourseSelect();
+    renderTopicList();
 
     await loadConversation();
     await loadTopics();
@@ -1145,11 +1193,11 @@ async function initApp() {
       await addBotMessage("Welcome back! Start exploring or ask me anything.");
     }
   } else {
-    renderCourseSelect();
+    renderTopicList();
     await sleep(400);
     await addBotMessage("Hey! Welcome to Studium.");
     await sleep(600);
-    await addBotMessage("I'm your study companion. To get started, tell me what subject you'd like to study -- for example, 'Linear Algebra' or 'Python'.");
+    await addBotMessage("I'm your study companion. To get started, tell me what subject you'd like to study -- for example, ==Linear Algebra== or ==Python==.");
   }
 
   focusInput();
